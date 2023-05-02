@@ -22,9 +22,19 @@ export async function postBooking(req: AuthenticatedRequest, res: Response) {
     try {
       const booking = await bookingService.postRoomBooking(res, roomId, userId); 
 
-      res.status(httpStatus.OK).send(booking);
+      res.status(httpStatus.OK).send(booking.id);
     } catch (error) {
       return res.status(httpStatus.FORBIDDEN).send({});
     }
-  }
+}
+
+export async function updateBookingRoom(req: Request, res: Response) {
+    const { bookingId } = req.params;
+    const { roomId } = req.body;
+  
+    const updatedBooking = await bookingService.updateBookingRoom(res, Number(bookingId), Number(roomId));
+  
+    return res.status(200).send(updatedBooking);
+}
+  
   

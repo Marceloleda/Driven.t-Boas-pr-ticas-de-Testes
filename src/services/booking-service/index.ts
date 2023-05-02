@@ -1,9 +1,10 @@
 import { notFoundError } from "@/errors";
 import bookingRepository from "@/repositories/booking-repository";
 import ticketsRepository from "@/repositories/tickets-repository";
-import { Ticket, TicketStatus } from "@prisma/client";
+import { Booking, TicketStatus } from "@prisma/client";
 import { Response } from "express";
 import httpStatus from "http-status";
+
 
 async function getAllBooking(userId: number) {
   const booking = await bookingRepository.findBooking(userId);
@@ -42,7 +43,31 @@ async function postRoomBooking(res: Response, roomId: number, userId: number): P
   return roomBooking;
 }
 
+async function updateBookingRoom(res: Response, bookingId: number, roomId: number): Promise<Booking> {
+    const booking = await bookingRepository.findBookingById(bookingId);
+    if (!booking) {
+      throw notFoundError();
+    }
+  
+    const room = await bookingRepository.findRoomById(roomId);
+    if (!room) {
+      throw notFoundError();
+    }
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 14);
+    
+    const isRoomAvailable = await bookingRepository.isRoomAvailable(roomId, startDate, endDate);
+    if (!isRoomAvailable) {
+      throw httpStatus.FORBIDDEN;
+    }
+  
+    return await bookingRepository.updateBookingRoom(bookingId, roomId);
+}
+  
+
 export default {
   getAllBooking,
   postRoomBooking,
+  updateBookingRoom
 };
