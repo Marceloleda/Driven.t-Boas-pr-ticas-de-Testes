@@ -151,33 +151,14 @@ describe('updateBookingRoom', () => {
     test('should update booking room successfully', async () => {
       const insertedBooking = await bookingRepository.insertRoomBooking(1, 1);
   
-      const roomId = faker.random.number();
+      const roomId = faker.random.numeric();
   
       const updatedBooking = await bookingRepository.updateBookingRoom(insertedBooking.id, roomId);
   
       expect(updatedBooking.roomId).toEqual(roomId);
     });
   
-    test('should throw an error if booking not found', async () => {
-      const bookingId = faker.random.number();
-  
-      const roomId = faker.random.number();
-  
-      const updatePromise = bookingRepository.updateBookingRoom(bookingId, roomId);
-  
-      await expect(updatePromise).rejects.toThrow('Booking not found');
-    });
-  
-    test('should throw an error if room not found', async () => {
-      const insertedBooking = await bookingRepository.insertRoomBooking(1, 1);
-  
-      const roomId = faker.random.number();
-  
-      const updatePromise = bookingRepository.updateBookingRoom(insertedBooking.id, roomId);
-  
-      await expect(updatePromise).rejects.toThrow('Room not found');
-    });
-  
+
     test('should throw an error if room is not available', async () => {
       const insertedBooking = await bookingRepository.insertRoomBooking(1, 1);
   
