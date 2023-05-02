@@ -1,73 +1,67 @@
-import { notFoundError } from "@/errors";
-import bookingRepository from "@/repositories/booking-repository";
-import ticketsRepository from "@/repositories/tickets-repository";
-import { Booking, TicketStatus } from "@prisma/client";
-import { Response } from "express";
-import httpStatus from "http-status";
+import { notFoundError } from '@/errors';
+import { badRequestError } from '@/errors/bad-request-error';
+import { cannotBookingError } from '@/errors/cannot-booking-error';
+import bookingRepository from '@/repositories/booking-repository';
+import enrollmentRepository from '@/repositories/enrollment-repository';
+import roomRepository from '@/repositories/room-repository';
+import ticketsRepository from '@/repositories/tickets-repository';
 
+async function checkEnrollmentTicket(userId: number) {
+  const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
+  if (!enrollment) throw cannotBookingError();
 
-async function getAllBooking(userId: number) {
-  const booking = await bookingRepository.findBooking(userId);
+  const ticket = await ticketsRepository.findTicketByEnrollmentId(enrollment.id);
 
-  if (!booking) {
-    throw notFoundError();
+  if (!ticket || ticket.status === 'RESERVED' || ticket.TicketType.isRemote || !ticket.TicketType.includesHotel) {
+    throw cannotBookingError();
   }
+}
+
+async function checkValidBooking(roomId: number) {
+  const room = await roomRepository.findById(roomId);
+  const bookings = await bookingRepository.findByRoomId(roomId);
+
+  if (!room) throw notFoundError();
+  if (room.capacity <= bookings.length) throw cannotBookingError();
+}
+
+async function getBooking(userId: number) {
+  const booking = await bookingRepository.findByUserId(userId);
+  if (!booking) throw notFoundError();
 
   return booking;
 }
 
-async function postRoomBooking(res: Response, roomId: number, userId: number): Promise<any> {
-  const userTickets = await ticketsRepository.findUserTickets(userId);
+async function bookingRoomById(userId: number, roomId: number) {
+  if (!roomId) throw badRequestError();
 
-  const hasValidTicket = userTickets.some(
-    (ticket) => ticket.ticketTypeId === 1 && ticket.status === TicketStatus.PAID
-  );
+  await checkEnrollmentTicket(userId);
+  await checkValidBooking(roomId);
 
-  if (!hasValidTicket) {
-    return res.status(httpStatus.FORBIDDEN).send({ error: "Invalid ticket" });
-  }
-
-  const room = await bookingRepository.findRoomById(roomId);
-
-  if (!room) {
-    throw notFoundError();
-  }
-
-  if (room.capacity <= 0) {
-    return res
-      .status(httpStatus.FORBIDDEN)
-  }
-
-  const roomBooking = await bookingRepository.insertRoomBooking(roomId, userId);
-
-  return roomBooking;
+  return bookingRepository.create({ roomId, userId });
 }
 
-async function updateBookingRoom(res: Response, bookingId: number, roomId: number): Promise<Booking> {
-    const booking = await bookingRepository.findBookingById(bookingId);
-    if (!booking) {
-      throw notFoundError();
-    }
-  
-    const room = await bookingRepository.findRoomById(roomId);
-    if (!room) {
-      throw notFoundError();
-    }
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 14);
-    
-    const isRoomAvailable = await bookingRepository.isRoomAvailable(roomId, startDate, endDate);
-    if (!isRoomAvailable) {
-      throw httpStatus.FORBIDDEN;
-    }
-  
-    return await bookingRepository.updateBookingRoom(bookingId, roomId);
-}
-  
+async function changeBookingRoomById(userId: number, roomId: number) {
+  if (!roomId) throw badRequestError();
 
-export default {
-  getAllBooking,
-  postRoomBooking,
-  updateBookingRoom
+  await checkValidBooking(roomId);
+  const booking = await bookingRepository.findByUserId(userId);
+
+  if (!booking || booking.userId !== userId) throw cannotBookingError();
+
+  return bookingRepository.upsertBooking({
+    id: booking.id,
+    roomId,
+    userId,
+  });
+}
+
+const bookingService = {
+  bookingRoomById,
+  getBooking,
+  changeBookingRoomById,
+  checkEnrollmentTicket,
+  checkValidBooking,
 };
+
+export default bookingService;

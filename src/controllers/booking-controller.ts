@@ -1,13 +1,13 @@
 import { AuthenticatedRequest } from "@/middlewares";
 import bookingService from "@/services/booking-service";
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import httpStatus from "http-status";
 
 export async function getBooking(req: AuthenticatedRequest, res: Response) {
     const userId: number  = req.userId;
 
     try{
-        const booking = await bookingService.getAllBooking(userId);
+        const booking = await bookingService.getBooking(userId);
         res.status(httpStatus.OK).send(booking)
     }
     catch(error){
@@ -20,7 +20,7 @@ export async function postBooking(req: AuthenticatedRequest, res: Response) {
     const roomId: number = req.body.roomId; 
   
     try {
-      const booking = await bookingService.postRoomBooking(res, roomId, userId); 
+      const booking = await bookingService.bookingRoomById( roomId, userId); 
 
       res.status(httpStatus.OK).send(booking.id);
     } catch (error) {
@@ -28,13 +28,21 @@ export async function postBooking(req: AuthenticatedRequest, res: Response) {
     }
 }
 
-export async function updateBookingRoom(req: Request, res: Response) {
-    const { bookingId } = req.params;
-    const { roomId } = req.body;
+export async function changeBooking(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    const { userId } = req;
+    const bookingId = Number(req.params.bookingId);
+    if (!bookingId) return res.sendStatus(httpStatus.BAD_REQUEST);
   
-    const updatedBooking = await bookingService.updateBookingRoom(res, Number(bookingId), Number(roomId));
+    try {
+      const { roomId } = req.body as Record<string, number>; // <tipo da chave, tipo do valor>
+      const booking = await bookingService.changeBookingRoomById(userId, roomId);
   
-    return res.status(200).send(updatedBooking);
-}
+      return res.status(httpStatus.OK).send({
+        bookingId: booking.id,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
   
   
